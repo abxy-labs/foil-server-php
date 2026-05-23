@@ -182,12 +182,38 @@ final class ClientTest extends TestCase
 
         $session = $client->sessions()->get('sid_0123456789abcdefghjkmnpqrs');
         self::assertSame($fixture['data']['id'], $session->id);
+        self::assertSame('user_123', $session->client_user_id);
         self::assertNull($session->native_runtime_integrity);
         self::assertNull($session->native_app);
         self::assertNull($session->native_carrier);
         self::assertNull($session->native_motion_print);
         self::assertNull($session->device_identity);
         self::assertNull($session->install_id);
+    }
+
+    public function testAttachesAndClearsClientUserId(): void
+    {
+        $fixture = FixtureLoader::load('api/sessions/detail.json');
+        $patchBodies = [];
+        $factory = new Psr17Factory();
+        $httpClient = new TestHttpClient(static function (RequestInterface $request) use ($fixture, &$patchBodies) {
+            self::assertSame('PATCH', $request->getMethod());
+            self::assertSame('/v1/sessions/sid_0123456789abcdefghjkmnpqrs', $request->getUri()->getPath());
+            self::assertSame('Bearer sk_live_test', $request->getHeaderLine('Authorization'));
+            $patchBodies[] = json_decode((string) $request->getBody(), true, 512, JSON_THROW_ON_ERROR);
+            return JsonResponse::create($fixture);
+        });
+
+        $client = new Client(
+            secretKey: 'sk_live_test',
+            httpClient: $httpClient,
+            requestFactory: $factory,
+            streamFactory: $factory,
+        );
+
+        self::assertSame($fixture['data']['id'], $client->sessions()->attachClientUser('sid_0123456789abcdefghjkmnpqrs', 'user_123')->id);
+        self::assertSame($fixture['data']['id'], $client->sessions()->clearClientUser('sid_0123456789abcdefghjkmnpqrs')->id);
+        self::assertSame([['client_user_id' => 'user_123'], ['client_user_id' => null]], $patchBodies);
     }
 
     public function testListsAndFetchesFingerprints(): void

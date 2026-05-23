@@ -44,6 +44,8 @@ $client = new Client(secretKey: getenv('FOIL_SECRET_KEY') ?: null);
 
 $page = $client->sessions()->list(verdict: 'bot', limit: 25);
 $session = $client->sessions()->get('sid_0123456789abcdefghjkmnpqrs');
+$client->sessions()->attachClientUser('sid_0123456789abcdefghjkmnpqrs', 'user_123');
+$client->sessions()->clearClientUser('sid_0123456789abcdefghjkmnpqrs');
 
 echo $session->decision['automation_status'] . ' ' . ($session->highlights[0]['summary'] ?? '') . PHP_EOL;
 ```

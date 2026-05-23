@@ -48,6 +48,26 @@ final class SessionsApi
         return SessionDetail::fromArray((array) $response['data']);
     }
 
+    public function attachClientUser(string $sessionId, string $clientUserId): SessionDetail
+    {
+        $response = $this->http->requestJson(
+            'PATCH',
+            '/v1/sessions/' . rawurlencode($sessionId),
+            body: ['client_user_id' => $clientUserId],
+        );
+        return SessionDetail::fromArray((array) $response['data']);
+    }
+
+    public function clearClientUser(string $sessionId): SessionDetail
+    {
+        $response = $this->http->requestJson(
+            'PATCH',
+            '/v1/sessions/' . rawurlencode($sessionId),
+            body: ['client_user_id' => null],
+        );
+        return SessionDetail::fromArray((array) $response['data']);
+    }
+
     /**
      * @return Generator<int, SessionSummary>
      */
