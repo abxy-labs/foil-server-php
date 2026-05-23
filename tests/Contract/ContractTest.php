@@ -133,6 +133,14 @@ final class ContractTest extends TestCase
         self::assertSame('^key_[0123456789abcdefghjkmnpqrstvwxyz]{26}$', $schemas['ApiKeyId']['pattern']);
 
         self::assertSame(['$ref' => '#/components/schemas/SessionId'], $this->withoutExamples($schemas['SessionSummary']['properties']['id']));
+        self::assertSame(
+            [
+                'type' => ['string', 'null'],
+                'maxLength' => 256,
+                'description' => 'Customer-supplied identifier for the end user associated with this Foil session. Set with PATCH /v1/sessions/{sessionId}.',
+            ],
+            $this->withoutExamples($schemas['SessionSummary']['properties']['client_user_id']),
+        );
         self::assertSame(['$ref' => '#/components/schemas/OrganizationStatus'], $this->withoutExamples($schemas['Organization']['properties']['status']));
         self::assertSame(['$ref' => '#/components/schemas/ApiKeyStatus'], $this->withoutExamples($schemas['ApiKey']['properties']['status']));
         self::assertSame(
@@ -142,6 +150,7 @@ final class ContractTest extends TestCase
         self::assertSame(['active', 'suspended', 'deleted'], $schemas['OrganizationStatus']['enum']);
         self::assertSame(['active', 'rotating', 'revoked'], $schemas['ApiKeyStatus']['enum']);
         self::assertContains('decision', $schemas['SessionDetail']['required']);
+        self::assertContains('client_user_id', $schemas['SessionDetail']['required']);
         self::assertContains('highlights', $schemas['SessionDetail']['required']);
         self::assertContains('attribution', $schemas['SessionDetail']['required']);
         self::assertContains('web_bot_auth', $schemas['SessionDetail']['required']);
@@ -194,6 +203,8 @@ final class ContractTest extends TestCase
 
         self::assertSame('listSessions', $paths['/v1/sessions']['get']['operationId']);
         self::assertSame(['Sessions'], $paths['/v1/sessions']['get']['tags']);
+        self::assertSame('updateSession', $paths['/v1/sessions/{sessionId}']['patch']['operationId']);
+        self::assertSame(['Sessions'], $paths['/v1/sessions/{sessionId}']['patch']['tags']);
         self::assertSame('getVisitorFingerprint', $paths['/v1/fingerprints/{visitorId}']['get']['operationId']);
         self::assertSame(['Visitor fingerprints'], $paths['/v1/fingerprints/{visitorId}']['get']['tags']);
         self::assertSame('updateOrganization', $paths['/v1/organizations/{organizationId}']['patch']['operationId']);
