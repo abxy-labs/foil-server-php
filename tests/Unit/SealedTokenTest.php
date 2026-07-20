@@ -29,6 +29,15 @@ final class SealedTokenTest extends TestCase
         self::assertSame($fixture['payload'], $verified->toArray());
     }
 
+    public function testVerifyMultiRecipientVectorWithEveryActiveKey(): void
+    {
+        $fixture = FixtureLoader::load('sealed-token/vector.v2.json');
+        foreach (array_merge($fixture['secretKeys'], $fixture['secretHashes']) as $secret) {
+            $verified = SealedToken::verify($fixture['token'], $secret);
+            self::assertSame($fixture['payload'], $verified->toArray());
+        }
+    }
+
     public function testInvalidTokenReturnsFailureResult(): void
     {
         $fixture = FixtureLoader::load('sealed-token/invalid.json');
