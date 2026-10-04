@@ -44,7 +44,7 @@ final class ClientTest extends TestCase
         }
     }
 
-    public function testThrowsWhenNoSecretKeyIsConfigured(): void
+    public function testDefersMissingSecretKeyErrorUntilRequest(): void
     {
         $original = getenv('FOIL_SECRET_KEY');
         putenv('FOIL_SECRET_KEY');
@@ -56,7 +56,7 @@ final class ClientTest extends TestCase
                 requestFactory: $factory,
                 streamFactory: $factory,
             );
-            self::assertNotNull($client->gate());
+            self::assertNotNull($client->sessions());
         } finally {
             if ($original !== false) {
                 putenv('FOIL_SECRET_KEY=' . $original);
@@ -375,145 +375,6 @@ final class ClientTest extends TestCase
             'session.fingerprint.calculated',
             $client->webhooks()->retrieveEvent('org_56789abcdefghjkmnpqrstvwxy', 'wevt_0123456789abcdef0123456789abcdef')->type,
         );
-    }
-
-    public function testSupportsGateEndpointsAcrossPublicBearerAndSecretFlows(): void
-    {
-        $registryListFixture = FixtureLoader::load('api/gate/registry-list.json');
-        $registryDetailFixture = FixtureLoader::load('api/gate/registry-detail.json');
-        $servicesListFixture = FixtureLoader::load('api/gate/services-list.json');
-        $serviceDetailFixture = FixtureLoader::load('api/gate/service-detail.json');
-        $serviceCreateFixture = FixtureLoader::load('api/gate/service-create.json');
-        $serviceUpdateFixture = FixtureLoader::load('api/gate/service-update.json');
-        $serviceDisableFixture = FixtureLoader::load('api/gate/service-disable.json');
-        $sessionCreateFixture = FixtureLoader::load('api/gate/session-create.json');
-        $sessionPollFixture = FixtureLoader::load('api/gate/session-poll.json');
-        $sessionAckFixture = FixtureLoader::load('api/gate/session-ack.json');
-        $loginCreateFixture = FixtureLoader::load('api/gate/login-session-create.json');
-        $loginConsumeFixture = FixtureLoader::load('api/gate/login-session-consume.json');
-        $agentVerifyFixture = FixtureLoader::load('api/gate/agent-token-verify.json');
-
-        $factory = new Psr17Factory();
-        $httpClient = new TestHttpClient(static function (RequestInterface $request) use (
-            $registryListFixture,
-            $registryDetailFixture,
-            $servicesListFixture,
-            $serviceDetailFixture,
-            $serviceCreateFixture,
-            $serviceUpdateFixture,
-            $serviceDisableFixture,
-            $sessionCreateFixture,
-            $sessionPollFixture,
-            $sessionAckFixture,
-            $loginCreateFixture,
-            $loginConsumeFixture,
-            $agentVerifyFixture,
-        ) {
-            $path = $request->getUri()->getPath();
-            $auth = $request->getHeaderLine('Authorization');
-
-            if ($path === '/v1/gate/registry') {
-                self::assertSame('', $auth);
-                return JsonResponse::create($registryListFixture);
-            }
-            if ($path === '/v1/gate/registry/foil') {
-                self::assertSame('', $auth);
-                return JsonResponse::create($registryDetailFixture);
-            }
-            if ($path === '/v1/gate/services' && $request->getMethod() === 'GET') {
-                self::assertSame('Bearer sk_live_test', $auth);
-                return JsonResponse::create($servicesListFixture);
-            }
-            if ($path === '/v1/gate/services/foil' && $request->getMethod() === 'GET') {
-                self::assertSame('Bearer sk_live_test', $auth);
-                return JsonResponse::create($serviceDetailFixture);
-            }
-            if ($path === '/v1/gate/services' && $request->getMethod() === 'POST') {
-                self::assertSame('Bearer sk_live_test', $auth);
-                return JsonResponse::create($serviceCreateFixture, 201);
-            }
-            if ($path === '/v1/gate/services/acme_prod' && $request->getMethod() === 'PATCH') {
-                self::assertSame('Bearer sk_live_test', $auth);
-                return JsonResponse::create($serviceUpdateFixture);
-            }
-            if ($path === '/v1/gate/services/acme_prod' && $request->getMethod() === 'DELETE') {
-                self::assertSame('Bearer sk_live_test', $auth);
-                return JsonResponse::create($serviceDisableFixture);
-            }
-            if ($path === '/v1/gate/sessions') {
-                self::assertSame('', $auth);
-                return JsonResponse::create($sessionCreateFixture, 201);
-            }
-            if ($path === '/v1/gate/sessions/gate_0123456789abcdefghjkmnpqrs' && $request->getMethod() === 'GET') {
-                self::assertSame('Bearer gtpoll_0123456789abcdefghjkmnpqrs', $auth);
-                return JsonResponse::create($sessionPollFixture);
-            }
-            if ($path === '/v1/gate/sessions/gate_0123456789abcdefghjkmnpqrs/ack') {
-                self::assertSame('Bearer gtpoll_0123456789abcdefghjkmnpqrs', $auth);
-                return JsonResponse::create($sessionAckFixture);
-            }
-            if ($path === '/v1/gate/login-sessions') {
-                self::assertSame('Bearer agt_0123456789abcdefghjkmnpqrs', $auth);
-                return JsonResponse::create($loginCreateFixture, 201);
-            }
-            if ($path === '/v1/gate/login-sessions/consume') {
-                self::assertSame('Bearer sk_live_test', $auth);
-                return JsonResponse::create($loginConsumeFixture);
-            }
-            if ($path === '/v1/gate/agent-tokens/verify') {
-                self::assertSame('Bearer sk_live_test', $auth);
-                return JsonResponse::create($agentVerifyFixture);
-            }
-            if ($path === '/v1/gate/agent-tokens/revoke') {
-                self::assertSame('Bearer sk_live_test', $auth);
-                return JsonResponse::create(null, 204);
-            }
-
-            self::fail('Unexpected request ' . $request->getMethod() . ' ' . $path);
-        });
-
-        $client = new Client(
-            secretKey: 'sk_live_test',
-            httpClient: $httpClient,
-            requestFactory: $factory,
-            streamFactory: $factory,
-        );
-
-        self::assertSame('foil', $client->gate()->registry()->list()[0]->id);
-        self::assertSame('foil', $client->gate()->registry()->get('foil')->id);
-        self::assertSame('acme_prod', $client->gate()->services()->list()[0]->id);
-        self::assertSame('acme_prod', $client->gate()->services()->get('foil')->id);
-        self::assertSame(
-            'acme_prod',
-            $client->gate()->services()->create(
-                'acme_prod',
-                'Acme Production',
-                'Acme production signup flow',
-                'https://acme.example.com',
-                'we_0123456789abcdef0123456789abcdef',
-            )->id,
-        );
-        self::assertTrue($client->gate()->services()->update('acme_prod', discoverable: true)->discoverable);
-        self::assertSame('disabled', $client->gate()->services()->disable('acme_prod')->status);
-        self::assertSame(
-            'gate_0123456789abcdefghjkmnpqrs',
-            $client->gate()->sessions()->create(
-                'foil',
-                'my-project',
-                [
-                    'version' => 1,
-                    'algorithm' => 'x25519-hkdf-sha256/aes-256-gcm',
-                    'key_id' => 'kid_integrator_0123456789abcdefgh',
-                    'public_key' => 'public_key_integrator',
-                ],
-            )->id,
-        );
-        self::assertSame('approved', $client->gate()->sessions()->poll('gate_0123456789abcdefghjkmnpqrs', 'gtpoll_0123456789abcdefghjkmnpqrs')->status);
-        self::assertSame('acknowledged', $client->gate()->sessions()->acknowledge('gate_0123456789abcdefghjkmnpqrs', 'gtpoll_0123456789abcdefghjkmnpqrs', 'gtack_0123456789abcdefghjkmnpqrs')->status);
-        self::assertSame('gate_login_session', $client->gate()->loginSessions()->create('foil', 'agt_0123456789abcdefghjkmnpqrs')->object);
-        self::assertSame('gate_dashboard_login', $client->gate()->loginSessions()->consume('gate_code_0123456789abcdefghjkm')->object);
-        self::assertTrue($client->gate()->agentTokens()->verify('agt_0123456789abcdefghjkmnpqrs')->valid);
-        self::assertNull($client->gate()->agentTokens()->revoke('agt_0123456789abcdefghjkmnpqrs'));
     }
 
     public function testParsesApiErrorsIntoFoilApiError(): void

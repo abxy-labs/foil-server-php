@@ -13,7 +13,6 @@ use Psr\Http\Client\ClientInterface as PsrHttpClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Foil\Server\Api\FingerprintsApi;
-use Foil\Server\Api\GateApi;
 use Foil\Server\Api\SessionsApi;
 use Foil\Server\Api\OrganizationsApi;
 use Foil\Server\Api\WebhooksApi;
@@ -27,7 +26,6 @@ final class Client
     private SessionsApi $sessions;
     private FingerprintsApi $fingerprints;
     private OrganizationsApi $organizations;
-    private GateApi $gate;
     private WebhooksApi $webhooks;
 
     /**
@@ -64,7 +62,6 @@ final class Client
         $this->sessions = new SessionsApi($transport);
         $this->fingerprints = new FingerprintsApi($transport);
         $this->organizations = new OrganizationsApi($transport);
-        $this->gate = new GateApi($transport);
         $this->webhooks = new WebhooksApi($transport);
     }
 
@@ -81,11 +78,6 @@ final class Client
     public function organizations(): OrganizationsApi
     {
         return $this->organizations;
-    }
-
-    public function gate(): GateApi
-    {
-        return $this->gate;
     }
 
     public function webhooks(): WebhooksApi
