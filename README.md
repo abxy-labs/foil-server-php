@@ -4,16 +4,14 @@
 ![PHP 8.1+](https://img.shields.io/badge/php-%E2%89%A58.1-777BB4?logo=php&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/license-MIT-0f766e.svg)
 
-The Foil PHP library provides convenient access to the Foil API from applications written in PHP. It includes a framework-agnostic client for Sessions, visitor fingerprints, Organizations, Organization API key management, sealed token verification, Gate, and Gate delivery/webhook helpers.
+The Foil PHP library provides convenient access to the Foil API from applications written in PHP. It includes a framework-agnostic client for Sessions, visitor fingerprints, Organizations, Organization API key management, webhook endpoints, and sealed token verification.
 
 The library also provides:
 
 - a fast configuration path using `FOIL_SECRET_KEY`
 - a bundled PSR-18 transport stack with support for custom PSR clients and factories
 - structured API errors and built-in sealed token verification
-- webhook endpoint management, test sends, and event delivery history
-- public, bearer-token, and secret-key auth modes for Gate flows
-- Gate delivery/webhook helpers
+- webhook endpoint management, test sends, event delivery history, and webhook signature verification
 
 ## Documentation
 
@@ -33,7 +31,7 @@ composer require abxy/foil-server
 
 ## Usage
 
-Use `FOIL_SECRET_KEY` or `secretKey` for core detect APIs. For public or bearer-auth Gate flows, the client can also be created without a secret key:
+Use `FOIL_SECRET_KEY` or `secretKey`:
 
 ```php
 <?php
@@ -115,7 +113,7 @@ $endpoint = $client->webhooks()->createEndpoint(
     'org_0123456789abcdefghjkmnpqrs',
     'Production alerts',
     'https://example.com/foil/webhook',
-    ['session.result.persisted', 'gate.session.approved'],
+    ['session.result.persisted'],
 );
 
 $events = $client->webhooks()->listEvents(
@@ -127,44 +125,34 @@ $events = $client->webhooks()->listEvents(
 echo $events->items[0]->webhook_deliveries[0]->status;
 ```
 
-### Gate APIs
+#### Verifying webhook deliveries
+
+Every webhook delivery is signed with your endpoint's signing secret. Verify the `X-Foil-Timestamp` and `X-Foil-Signature` headers against the raw request body before trusting the payload:
 
 ```php
 <?php
 
-use Foil\Server\Client;
-use Foil\Server\GateDelivery;
+use Foil\Server\Webhooks;
 
-$client = new Client();
-$services = $client->gate()->registry()->list();
-$session = $client->gate()->sessions()->create(
-    serviceId: 'foil',
-    accountName: 'my-project',
-    delivery: GateDelivery::createDeliveryKeyPair()['delivery'],
-);
+$rawBody = file_get_contents('php://input');
+$timestamp = $_SERVER['HTTP_X_FOIL_TIMESTAMP'] ?? '';
+$signature = $_SERVER['HTTP_X_FOIL_SIGNATURE'] ?? '';
+$secret = getenv('FOIL_WEBHOOK_SECRET');
 
-echo $services[0]->id . ' ' . $session->consent_url . PHP_EOL;
+$valid = Webhooks::verifyWebhookSignature($secret, $timestamp, $rawBody, $signature);
+
+// Verify and parse in one step. Throws InvalidArgumentException if the signature is invalid or expired.
+$event = Webhooks::verifyAndParseWebhookEvent($secret, $timestamp, $rawBody, $signature);
+
+if ($event['type'] === 'session.result.persisted') {
+    var_dump($event['data']);
+}
+
+// Parse a payload you have already verified.
+$parsed = Webhooks::parseWebhookEvent($rawBody);
 ```
 
-### Gate delivery and webhook helpers
-
-```php
-<?php
-
-use Foil\Server\GateDelivery;
-
-$keyPair = GateDelivery::createDeliveryKeyPair();
-$response = GateDelivery::createGateApprovedWebhookResponse([
-    'delivery' => $keyPair['delivery'],
-    'outputs' => [
-        'FOIL_PUBLISHABLE_KEY' => 'pk_live_...',
-        'FOIL_SECRET_KEY' => 'sk_live_...',
-    ],
-]);
-$payload = GateDelivery::decryptGateDeliveryEnvelope($keyPair['private_key'], $response['encrypted_delivery']);
-
-echo $payload['outputs']['FOIL_SECRET_KEY'] . PHP_EOL;
-```
+Signatures older than five minutes are rejected by default. Pass `maxAgeSeconds:` to change the tolerance.
 
 ### Error handling
 

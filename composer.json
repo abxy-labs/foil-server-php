@@ -3,12 +3,11 @@
   "description": "Official Foil PHP server SDK",
   "type": "library",
   "license": "MIT",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "require": {
     "php": "^8.1",
     "ext-json": "*",
     "ext-openssl": "*",
-    "ext-sodium": "*",
     "ext-zlib": "*",
     "guzzlehttp/guzzle": "^7.9",
     "nyholm/psr7": "^1.8",

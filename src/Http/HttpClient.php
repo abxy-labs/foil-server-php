@@ -13,9 +13,6 @@ use Foil\Server\Exception\FoilApiError;
 final class HttpClient
 {
     private const SDK_CLIENT_HEADER = 'abxy/foil-server';
-    public const AUTH_SECRET = 'secret';
-    public const AUTH_NONE = 'none';
-    public const AUTH_BEARER = 'bearer';
 
     public function __construct(
         private readonly ?string $secretKey,
@@ -38,28 +35,17 @@ final class HttpClient
         array $query = [],
         ?array $body = null,
         bool $expectContent = true,
-        string $authMode = self::AUTH_SECRET,
-        ?string $bearerToken = null,
     ): array {
         $request = $this->requestFactory->createRequest($method, $this->buildUrl($path, $query))
             ->withHeader('Accept', 'application/json')
             ->withHeader('X-Foil-Client', self::SDK_CLIENT_HEADER);
 
-        if ($authMode === self::AUTH_BEARER) {
-            if ($bearerToken === null || $bearerToken === '') {
-                throw new \Foil\Server\Exception\FoilConfigurationError(
-                    'Missing bearer token for this Foil request.',
-                );
-            }
-            $request = $request->withHeader('Authorization', 'Bearer ' . $bearerToken);
-        } elseif ($authMode === self::AUTH_SECRET) {
-            if ($this->secretKey === null || $this->secretKey === '') {
-                throw new \Foil\Server\Exception\FoilConfigurationError(
-                    'Missing Foil secret key. Pass secretKey explicitly or set FOIL_SECRET_KEY.',
-                );
-            }
-            $request = $request->withHeader('Authorization', 'Bearer ' . $this->secretKey);
+        if ($this->secretKey === null || $this->secretKey === '') {
+            throw new \Foil\Server\Exception\FoilConfigurationError(
+                'Missing Foil secret key. Pass secretKey explicitly or set FOIL_SECRET_KEY.',
+            );
         }
+        $request = $request->withHeader('Authorization', 'Bearer ' . $this->secretKey);
 
         if ($this->userAgent !== null && $this->userAgent !== '') {
             $request = $request->withHeader('User-Agent', $this->userAgent);
