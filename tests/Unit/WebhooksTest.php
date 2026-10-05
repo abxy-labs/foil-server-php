@@ -45,6 +45,19 @@ final class WebhooksTest extends TestCase
         self::assertFalse($verify('whsec_other', $this->fixture['raw_body'], $this->fixture['signature']));
     }
 
+    public function testEmptySecretIsRejected(): void
+    {
+        $signature = hash_hmac('sha256', $this->fixture['timestamp'] . '.' . $this->fixture['raw_body'], '');
+
+        self::assertFalse(Webhooks::verifyWebhookSignature(
+            '',
+            $this->fixture['timestamp'],
+            $this->fixture['raw_body'],
+            $signature,
+            nowSeconds: $this->fixture['now_seconds'],
+        ));
+    }
+
     public function testExpiredAndMalformedTimestampsAreRejected(): void
     {
         self::assertFalse(Webhooks::verifyWebhookSignature(
@@ -110,6 +123,7 @@ final class WebhooksTest extends TestCase
 
         foreach ([
             'unsupported webhook event type' => ['type' => 'unknown.event'],
+            'unsupported webhook event type: session.fingerprint.calculated' => ['type' => 'session.fingerprint.calculated'],
             'webhook_event' => ['object' => 'event'],
             'data must be an object' => ['data' => 'nope'],
         ] as $message => $override) {

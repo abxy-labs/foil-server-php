@@ -7,7 +7,6 @@ namespace Foil\Server;
 final class Webhooks
 {
     private const WEBHOOK_EVENT_TYPES = [
-        'session.fingerprint.calculated' => true,
         'session.result.persisted' => true,
         'webhook.test' => true,
     ];
@@ -20,6 +19,9 @@ final class Webhooks
         int $maxAgeSeconds = 300,
         ?int $nowSeconds = null,
     ): bool {
+        if ($secret === '') {
+            return false;
+        }
         if (!preg_match('/^-?\d+$/', $timestamp)) {
             return false;
         }

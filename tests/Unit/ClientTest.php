@@ -312,7 +312,7 @@ final class ClientTest extends TestCase
             'id' => 'wdlv_0123456789abcdef0123456789abcdef',
             'event_id' => 'wevt_0123456789abcdef0123456789abcdef',
             'endpoint_id' => 'we_0123456789abcdef0123456789abcdef',
-            'event_type' => 'session.fingerprint.calculated',
+            'event_type' => 'session.result.persisted',
             'status' => 'succeeded',
             'attempts' => 1,
             'response_status' => 200,
@@ -324,7 +324,7 @@ final class ClientTest extends TestCase
         $event = [
             'object' => 'event',
             'id' => 'wevt_0123456789abcdef0123456789abcdef',
-            'type' => 'session.fingerprint.calculated',
+            'type' => 'session.result.persisted',
             'subject' => ['type' => 'session', 'id' => 'sid_0123456789abcdefghjkmnpqrs'],
             'data' => ['source' => 'waitForFingerprint'],
             'webhook_deliveries' => [$delivery],
@@ -338,7 +338,7 @@ final class ClientTest extends TestCase
             if ($path === '/v1/organizations/org_56789abcdefghjkmnpqrstvwxy/events') {
                 parse_str($request->getUri()->getQuery(), $query);
                 self::assertSame('we_0123456789abcdef0123456789abcdef', $query['endpoint_id']);
-                self::assertSame('session.fingerprint.calculated', $query['type']);
+                self::assertSame('session.result.persisted', $query['type']);
                 return JsonResponse::create([
                     'data' => [$event],
                     'pagination' => ['limit' => 25, 'has_more' => false],
@@ -365,14 +365,14 @@ final class ClientTest extends TestCase
         $events = $client->webhooks()->listEvents(
             'org_56789abcdefghjkmnpqrstvwxy',
             'we_0123456789abcdef0123456789abcdef',
-            'session.fingerprint.calculated',
+            'session.result.persisted',
             25,
         );
 
         self::assertSame('sid_0123456789abcdefghjkmnpqrs', $events->items[0]->subject->id);
         self::assertSame('succeeded', $events->items[0]->webhook_deliveries[0]->status);
         self::assertSame(
-            'session.fingerprint.calculated',
+            'session.result.persisted',
             $client->webhooks()->retrieveEvent('org_56789abcdefghjkmnpqrstvwxy', 'wevt_0123456789abcdef0123456789abcdef')->type,
         );
     }
