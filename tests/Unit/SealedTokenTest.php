@@ -12,6 +12,45 @@ use Foil\Server\Tests\Support\FixtureLoader;
 
 final class SealedTokenTest extends TestCase
 {
+    private const CAP_TEST_SECRET = 'sk_live_cap_test';
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private static function sealLegacyToken(array $payload, string $secretKey): string
+    {
+        $key = hash('sha256', hash('sha256', $secretKey) . "\0sealed-results", true);
+        $nonce = random_bytes(12);
+        $tag = '';
+        $compressed = gzcompress(json_encode($payload, JSON_THROW_ON_ERROR));
+        $ciphertext = openssl_encrypt($compressed, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $nonce, $tag);
+        self::assertIsString($ciphertext);
+
+        return base64_encode("\x01" . $nonce . $ciphertext . $tag);
+    }
+
+    public function testAcceptsPayloadJustUnderSizeCap(): void
+    {
+        $payload = FixtureLoader::load('sealed-token/vector.v1.json')['payload'];
+        $payload['padding'] = str_repeat(
+            'a',
+            SealedToken::MAX_PAYLOAD_BYTES - strlen(json_encode($payload, JSON_THROW_ON_ERROR)) - 64,
+        );
+        $verified = SealedToken::verify(self::sealLegacyToken($payload, self::CAP_TEST_SECRET), self::CAP_TEST_SECRET);
+
+        self::assertSame($payload['session_id'], $verified->session_id);
+    }
+
+    public function testRejectsAuthenticTokenThatDecompressesPastSizeCap(): void
+    {
+        $payload = FixtureLoader::load('sealed-token/vector.v1.json')['payload'];
+        $payload['padding'] = str_repeat('a', 2 * 1048576);
+
+        $this->expectException(FoilTokenVerificationError::class);
+        $this->expectExceptionMessage('Foil token payload is too large.');
+        SealedToken::verify(self::sealLegacyToken($payload, self::CAP_TEST_SECRET), self::CAP_TEST_SECRET);
+    }
+
     public function testVerifyVectorWithPlaintextSecret(): void
     {
         $fixture = FixtureLoader::load('sealed-token/vector.v1.json');

@@ -24,6 +24,9 @@ final class SealedToken
     private const V2_RECIPIENT_BYTES = 92;
     private const V2_PAYLOAD_AAD_PREFIX = "foil-sealed-results-v2\0payload\0";
     private const V2_WRAP_AAD_PREFIX = "foil-sealed-results-v2\0recipient\0";
+    // Decompressed payloads are a few kilobytes; the cap bounds memory if a token decompresses to far more.
+    public const MAX_PAYLOAD_BYTES = 1048576;
+    private const INFLATE_CHUNK_BYTES = 1024;
 
     public static function verify(string $sealedToken, ?string $secretKey = null): VerifiedFoilToken
     {
@@ -44,10 +47,7 @@ final class SealedToken
             throw new FoilTokenVerificationError('Failed to verify Foil token.');
         }
 
-        $inflated = zlib_decode($plaintext);
-        if (!is_string($inflated)) {
-            throw new FoilTokenVerificationError('Failed to verify Foil token.');
-        }
+        $inflated = self::inflatePayload($plaintext);
 
         try {
             $payload = json_decode($inflated, true, 512, JSON_THROW_ON_ERROR);
@@ -87,6 +87,32 @@ final class SealedToken
         }
 
         return $resolved;
+    }
+
+    private static function inflatePayload(string $compressed): string
+    {
+        $context = inflate_init(ZLIB_ENCODING_DEFLATE);
+        if ($context === false) {
+            throw new FoilTokenVerificationError('Failed to verify Foil token.');
+        }
+
+        // Feed small chunks so one call can never expand far past the cap before it is checked.
+        $payload = '';
+        foreach (str_split($compressed, self::INFLATE_CHUNK_BYTES) as $chunk) {
+            $inflated = @inflate_add($context, $chunk, ZLIB_SYNC_FLUSH);
+            if (!is_string($inflated)) {
+                throw new FoilTokenVerificationError('Failed to verify Foil token.');
+            }
+            $payload .= $inflated;
+            if (strlen($payload) > self::MAX_PAYLOAD_BYTES) {
+                throw new FoilTokenVerificationError('Foil token payload is too large.');
+            }
+        }
+
+        if (inflate_get_status($context) !== ZLIB_STREAM_END) {
+            throw new FoilTokenVerificationError('Failed to verify Foil token.');
+        }
+        return $payload;
     }
 
     private static function deriveKey(string $secretKeyOrHash): string
