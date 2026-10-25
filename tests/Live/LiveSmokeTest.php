@@ -54,7 +54,7 @@ final class LiveSmokeTest extends TestCase
                 environment: 'test',
             );
             $createdKeyId = $created->id;
-            self::assertStringStartsWith('sk_', $created->revealed_key);
+            self::assertTrue(str_starts_with($created->revealed_key, 'pk_test_'), 'Created API key does not start with pk_test_.');
 
             $listedKey = $this->findApiKey($client, $organizationId, $created->id);
             self::assertNotNull($listedKey);
@@ -62,7 +62,7 @@ final class LiveSmokeTest extends TestCase
 
             $rotated = $client->organizations()->apiKeys()->rotate($organizationId, $created->id);
             $rotatedKeyId = $rotated->id;
-            self::assertStringStartsWith('sk_', $rotated->revealed_key);
+            self::assertTrue(str_starts_with($rotated->revealed_key, 'pk_test_'), 'Rotated API key does not start with pk_test_.');
 
             $fixture = FixtureLoader::load('sealed-token/vector.v1.json');
             $verified = SealedToken::safeVerify($fixture['token'], $fixture['secretKey']);
