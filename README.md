@@ -40,10 +40,12 @@ use Foil\Server\Client;
 
 $client = new Client(secretKey: getenv('FOIL_SECRET_KEY') ?: null);
 
-$page = $client->sessions()->list(verdict: 'bot', limit: 25);
+$page = $client->sessions()->list(verdict: 'bot', limit: 25, clientUserId: 'user_123', clientApplicationId: 'app_123');
 $session = $client->sessions()->get('sid_0123456789abcdefghjkmnpqrs');
 $client->sessions()->attachClientUser('sid_0123456789abcdefghjkmnpqrs', 'user_123');
 $client->sessions()->clearClientUser('sid_0123456789abcdefghjkmnpqrs');
+$client->sessions()->attachClientApplication('sid_0123456789abcdefghjkmnpqrs', 'app_123');
+$client->sessions()->clearClientApplication('sid_0123456789abcdefghjkmnpqrs');
 
 echo $session->decision['automation_status'] . ' ' . ($session->highlights[0]['summary'] ?? '') . PHP_EOL;
 ```

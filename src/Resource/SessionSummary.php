@@ -15,6 +15,7 @@ final class SessionSummary
         public readonly string $id,
         public readonly ?string $created_at,
         public readonly ?string $client_user_id,
+        public readonly ?string $client_application_id,
         public readonly array $latest_decision,
         public readonly ?array $visitor_fingerprint,
     ) {
@@ -30,6 +31,7 @@ final class SessionSummary
             (string) $data['id'],
             isset($data['created_at']) ? (string) $data['created_at'] : null,
             isset($data['client_user_id']) ? (string) $data['client_user_id'] : null,
+            isset($data['client_application_id']) ? (string) $data['client_application_id'] : null,
             (array) $data['latest_decision'],
             isset($data['visitor_fingerprint']) && is_array($data['visitor_fingerprint']) ? $data['visitor_fingerprint'] : null,
         );
@@ -45,6 +47,7 @@ final class SessionSummary
             'id' => $this->id,
             'created_at' => $this->created_at,
             'client_user_id' => $this->client_user_id,
+            'client_application_id' => $this->client_application_id,
             'latest_decision' => $this->latest_decision,
             'visitor_fingerprint' => $this->visitor_fingerprint,
         ];
