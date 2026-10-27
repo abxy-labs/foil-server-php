@@ -99,6 +99,8 @@ final class ClientTest extends TestCase
             parse_str($request->getUri()->getQuery(), $query);
             self::assertSame('bot', $query['verdict']);
             self::assertSame('25', (string) $query['limit']);
+            self::assertArrayNotHasKey('client_user_id', $query);
+            self::assertArrayNotHasKey('client_application_id', $query);
             self::assertSame('Bearer sk_live_test', $request->getHeaderLine('Authorization'));
             self::assertSame('abxy/foil-server', $request->getHeaderLine('X-Foil-Client'));
 
@@ -117,6 +119,36 @@ final class ClientTest extends TestCase
         self::assertTrue($result->has_more);
         self::assertSame('cur_sessions_page_2', $result->next_cursor);
         self::assertSame($fixture['data'][0]['id'], $result->items[0]->id);
+    }
+
+    public function testFiltersSessionListByClientUserIdAndClientApplicationId(): void
+    {
+        $fixture = FixtureLoader::load('api/sessions/list.json');
+        $queries = [];
+        $factory = new Psr17Factory();
+        $httpClient = new TestHttpClient(static function (RequestInterface $request) use ($fixture, &$queries) {
+            self::assertSame('/v1/sessions', $request->getUri()->getPath());
+            parse_str($request->getUri()->getQuery(), $query);
+            $queries[] = $query;
+
+            return JsonResponse::create($fixture);
+        });
+
+        $client = new Client(
+            secretKey: 'sk_live_test',
+            httpClient: $httpClient,
+            requestFactory: $factory,
+            streamFactory: $factory,
+        );
+
+        $client->sessions()->list(clientUserId: 'user_123', clientApplicationId: 'app_123', limit: 10);
+        $client->sessions()->list(clientApplicationId: 'app 456');
+
+        self::assertSame('user_123', $queries[0]['client_user_id']);
+        self::assertSame('app_123', $queries[0]['client_application_id']);
+        self::assertSame('10', (string) $queries[0]['limit']);
+        self::assertArrayNotHasKey('client_user_id', $queries[1]);
+        self::assertSame('app 456', $queries[1]['client_application_id']);
     }
 
     public function testIteratesPaginatedSessionResults(): void
@@ -144,8 +176,10 @@ final class ClientTest extends TestCase
         ];
 
         $factory = new Psr17Factory();
-        $httpClient = new TestHttpClient(static function (RequestInterface $request) use ($firstPage, $secondPage) {
+        $queries = [];
+        $httpClient = new TestHttpClient(static function (RequestInterface $request) use ($firstPage, $secondPage, &$queries) {
             parse_str($request->getUri()->getQuery(), $query);
+            $queries[] = $query;
             return JsonResponse::create(isset($query['cursor']) ? $secondPage : $firstPage);
         });
 
@@ -162,6 +196,17 @@ final class ClientTest extends TestCase
         }
 
         self::assertSame(['sid_0123456789abcdefghjkmnpqrs', 'sid_123456789abcdefghjkmnpqrst'], $ids);
+
+        $queries = [];
+        foreach ($client->sessions()->iterate(clientUserId: 'user_123', clientApplicationId: 'app_123') as $item) {
+            // Drain the generator so every page is requested.
+        }
+
+        self::assertCount(2, $queries);
+        foreach ($queries as $query) {
+            self::assertSame('user_123', $query['client_user_id']);
+            self::assertSame('app_123', $query['client_application_id']);
+        }
     }
 
     public function testFetchesSessionDetailResource(): void
@@ -183,6 +228,7 @@ final class ClientTest extends TestCase
         $session = $client->sessions()->get('sid_0123456789abcdefghjkmnpqrs');
         self::assertSame($fixture['data']['id'], $session->id);
         self::assertSame('user_123', $session->client_user_id);
+        self::assertSame('app_123', $session->client_application_id);
         self::assertNull($session->native_runtime_integrity);
         self::assertNull($session->native_app);
         self::assertNull($session->native_carrier);
@@ -214,6 +260,31 @@ final class ClientTest extends TestCase
         self::assertSame($fixture['data']['id'], $client->sessions()->attachClientUser('sid_0123456789abcdefghjkmnpqrs', 'user_123')->id);
         self::assertSame($fixture['data']['id'], $client->sessions()->clearClientUser('sid_0123456789abcdefghjkmnpqrs')->id);
         self::assertSame([['client_user_id' => 'user_123'], ['client_user_id' => null]], $patchBodies);
+    }
+
+    public function testAttachesAndClearsClientApplicationId(): void
+    {
+        $fixture = FixtureLoader::load('api/sessions/detail.json');
+        $patchBodies = [];
+        $factory = new Psr17Factory();
+        $httpClient = new TestHttpClient(static function (RequestInterface $request) use ($fixture, &$patchBodies) {
+            self::assertSame('PATCH', $request->getMethod());
+            self::assertSame('/v1/sessions/sid_0123456789abcdefghjkmnpqrs', $request->getUri()->getPath());
+            self::assertSame('Bearer sk_live_test', $request->getHeaderLine('Authorization'));
+            $patchBodies[] = json_decode((string) $request->getBody(), true, 512, JSON_THROW_ON_ERROR);
+            return JsonResponse::create($fixture);
+        });
+
+        $client = new Client(
+            secretKey: 'sk_live_test',
+            httpClient: $httpClient,
+            requestFactory: $factory,
+            streamFactory: $factory,
+        );
+
+        self::assertSame($fixture['data']['id'], $client->sessions()->attachClientApplication('sid_0123456789abcdefghjkmnpqrs', 'app_123')->id);
+        self::assertSame($fixture['data']['id'], $client->sessions()->clearClientApplication('sid_0123456789abcdefghjkmnpqrs')->id);
+        self::assertSame([['client_application_id' => 'app_123'], ['client_application_id' => null]], $patchBodies);
     }
 
     public function testListsAndFetchesFingerprints(): void

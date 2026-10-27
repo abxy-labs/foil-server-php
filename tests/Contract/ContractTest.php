@@ -116,6 +116,17 @@ final class ContractTest extends TestCase
             ],
             $this->withoutExamples($schemas['SessionSummary']['properties']['client_user_id']),
         );
+        self::assertSame(
+            [
+                'type' => ['string', 'null'],
+                'maxLength' => 256,
+                'description' => 'Customer-supplied identifier for the application or organization on your platform that this Foil session belongs to. Set with PATCH /v1/sessions/{sessionId}.',
+            ],
+            $this->withoutExamples($schemas['SessionSummary']['properties']['client_application_id']),
+        );
+        self::assertContains('client_application_id', $schemas['SessionSummary']['required']);
+        self::assertArrayHasKey('client_user_id', $schemas['UpdateSessionRequest']['properties']);
+        self::assertArrayHasKey('client_application_id', $schemas['UpdateSessionRequest']['properties']);
         self::assertSame(['$ref' => '#/components/schemas/OrganizationStatus'], $this->withoutExamples($schemas['Organization']['properties']['status']));
         self::assertSame(['$ref' => '#/components/schemas/ApiKeyStatus'], $this->withoutExamples($schemas['ApiKey']['properties']['status']));
         self::assertSame(
@@ -126,6 +137,7 @@ final class ContractTest extends TestCase
         self::assertSame(['active', 'rotating', 'revoked'], $schemas['ApiKeyStatus']['enum']);
         self::assertContains('decision', $schemas['SessionDetail']['required']);
         self::assertContains('client_user_id', $schemas['SessionDetail']['required']);
+        self::assertContains('client_application_id', $schemas['SessionDetail']['required']);
         self::assertContains('highlights', $schemas['SessionDetail']['required']);
         self::assertContains('attribution', $schemas['SessionDetail']['required']);
         self::assertContains('web_bot_auth', $schemas['SessionDetail']['required']);
@@ -168,6 +180,15 @@ final class ContractTest extends TestCase
         self::assertContains('grace_expires_at', $schemas['ApiKey']['required']);
         self::assertContains('revealed_key', $schemas['IssuedApiKey']['required']);
         self::assertArrayNotHasKey('CollectBatchResponse', $schemas);
+    }
+
+    public function testListSessionsAcceptsClientIdFilters(): void
+    {
+        $parameters = array_column($this->readSpec()['paths']['/v1/sessions']['get']['parameters'], 'name');
+
+        foreach (['limit', 'cursor', 'verdict', 'search', 'client_user_id', 'client_application_id'] as $name) {
+            self::assertContains($name, $parameters);
+        }
     }
 
     public function testPublicOperationsHaveStableIDsAndTags(): void
