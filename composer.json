@@ -3,7 +3,7 @@
   "description": "Official Foil PHP server SDK",
   "type": "library",
   "license": "MIT",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "require": {
     "php": "^8.1",
     "ext-json": "*",
