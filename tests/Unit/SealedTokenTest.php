@@ -77,6 +77,26 @@ final class SealedTokenTest extends TestCase
         }
     }
 
+    public function testBotVectorAttributionUsesSessionDetailShape(): void
+    {
+        $fixture = FixtureLoader::load('sealed-token/vector.v2.bot.json');
+        $verified = SealedToken::verify($fixture['token'], $fixture['secretKeys'][0]);
+
+        self::assertSame($fixture['payload'], $verified->toArray());
+        $bot = $verified->attribution['bot'];
+        self::assertSame(
+            ['kind' => 'actor', 'value' => 'automation', 'label' => 'Automation', 'confidence' => 100],
+            $bot['labels'][0],
+        );
+        $entries = array_merge($bot['labels'], $bot['behaviors']);
+        self::assertGreaterThan(1, count($entries));
+        foreach ($entries as $entry) {
+            self::assertIsInt($entry['confidence']);
+            self::assertGreaterThanOrEqual(0, $entry['confidence']);
+            self::assertLessThanOrEqual(100, $entry['confidence']);
+        }
+    }
+
     public function testInvalidTokenReturnsFailureResult(): void
     {
         $fixture = FixtureLoader::load('sealed-token/invalid.json');
