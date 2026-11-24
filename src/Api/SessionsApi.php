@@ -21,6 +21,7 @@ final class SessionsApi
         ?string $search = null,
         ?string $clientUserId = null,
         ?string $clientApplicationId = null,
+        ?string $clientSessionId = null,
     ): ListResult {
         $response = $this->http->requestJson('GET', '/v1/sessions', [
             'limit' => $limit,
@@ -29,6 +30,7 @@ final class SessionsApi
             'search' => $search,
             'client_user_id' => $clientUserId,
             'client_application_id' => $clientApplicationId,
+            'client_session_id' => $clientSessionId,
         ]);
 
         $items = [];
@@ -92,6 +94,26 @@ final class SessionsApi
         return SessionDetail::fromArray((array) $response['data']);
     }
 
+    public function attachClientSession(string $sessionId, string $clientSessionId): SessionDetail
+    {
+        $response = $this->http->requestJson(
+            'PATCH',
+            '/v1/sessions/' . rawurlencode($sessionId),
+            body: ['client_session_id' => $clientSessionId],
+        );
+        return SessionDetail::fromArray((array) $response['data']);
+    }
+
+    public function clearClientSession(string $sessionId): SessionDetail
+    {
+        $response = $this->http->requestJson(
+            'PATCH',
+            '/v1/sessions/' . rawurlencode($sessionId),
+            body: ['client_session_id' => null],
+        );
+        return SessionDetail::fromArray((array) $response['data']);
+    }
+
     /**
      * @return Generator<int, SessionSummary>
      */
@@ -101,11 +123,12 @@ final class SessionsApi
         ?string $search = null,
         ?string $clientUserId = null,
         ?string $clientApplicationId = null,
+        ?string $clientSessionId = null,
     ): Generator {
         $cursor = null;
 
         do {
-            $page = $this->list($limit, $cursor, $verdict, $search, $clientUserId, $clientApplicationId);
+            $page = $this->list($limit, $cursor, $verdict, $search, $clientUserId, $clientApplicationId, $clientSessionId);
             foreach ($page->items as $item) {
                 yield $item;
             }
